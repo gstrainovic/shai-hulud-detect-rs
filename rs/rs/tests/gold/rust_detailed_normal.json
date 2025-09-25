@@ -1,0 +1,93 @@
+{
+  "compromised_packages": [],
+  "crypto_patterns": [
+    {
+      "info": "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:XMLHttpRequest prototype modification detected",
+      "path": "test-cases/infected-project/crypto-theft.js"
+    },
+    {
+      "info": "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Known attacker wallet address detected - HIGH RISK",
+      "path": "test-cases/infected-project/crypto-theft.js"
+    }
+  ],
+  "git_branches": [],
+  "gold_findings": {
+    "compromised_packages": {},
+    "crypto_patterns": {
+      "test-cases/infected-project/crypto-theft.js": [
+        "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:XMLHttpRequest prototype modification detected",
+        "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Known attacker wallet address detected - HIGH RISK"
+      ]
+    },
+    "git_branches": {},
+    "malicious_hashes": {},
+    "network_exfiltration": {},
+    "package_integrity": {
+      "test-cases/infected-lockfile-pnpm/pnpm-lock.yaml": [
+        "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-lockfile-pnpm/pnpm-lock.yaml"
+      ],
+      "test-cases/infected-lockfile/package-lock.js": [
+        "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-lockfile/package-lock.json"
+      ]
+    },
+    "postinstall_hooks": {},
+    "shai_hulud_repos": {},
+    "suspicious_content": {
+      "test-cases/clean-project/package.js": [
+        "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/clean-project/package.json"
+      ],
+      "test-cases/infected-project/crypto-theft.js": [
+        "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Ethereum wallet address patterns detected",
+        "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Phishing domain npmjs.help detected"
+      ],
+      "test-cases/infected-project/package.js": [
+        "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/package.json"
+      ],
+      "test-cases/mixed-project/package.js": [
+        "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/mixed-project/package.json"
+      ]
+    },
+    "trufflehog_activity": {},
+    "typosquatting": {},
+    "workflow_files": {}
+  },
+  "malicious_hashes": [],
+  "network_exfiltration": [],
+  "package_integrity": [
+    {
+      "info": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-lockfile-pnpm/pnpm-lock.yaml",
+      "path": "test-cases/infected-lockfile-pnpm/pnpm-lock.yaml"
+    },
+    {
+      "info": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-lockfile/package-lock.json",
+      "path": "test-cases/infected-lockfile/package-lock.js"
+    }
+  ],
+  "postinstall_hooks": [],
+  "shai_hulud_repos": [],
+  "suspicious_content": [
+    {
+      "info": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/clean-project/package.json",
+      "path": "test-cases/clean-project/package.js"
+    },
+    {
+      "info": "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Ethereum wallet address patterns detected",
+      "path": "test-cases/infected-project/crypto-theft.js"
+    },
+    {
+      "info": "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Phishing domain npmjs.help detected",
+      "path": "test-cases/infected-project/crypto-theft.js"
+    },
+    {
+      "info": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/package.json",
+      "path": "test-cases/infected-project/package.js"
+    },
+    {
+      "info": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/mixed-project/package.json",
+      "path": "test-cases/mixed-project/package.js"
+    }
+  ],
+  "trufflehog_activity": [],
+  "typosquatting": [],
+  "workflow_files": []
+}

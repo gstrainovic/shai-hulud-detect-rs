@@ -1,0 +1,62 @@
+{
+  "workflow_files": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  },
+  "malicious_hashes": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  },
+  "compromised_packages": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  },
+  "postinstall_hooks": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  },
+  "suspicious_content": {
+    "bash_count": 5,
+    "rust_count": 5,
+    "diffs": []
+  },
+  "crypto_patterns": {
+    "bash_count": 2,
+    "rust_count": 2,
+    "diffs": []
+  },
+  "trufflehog_activity": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  },
+  "git_branches": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  },
+  "shai_hulud_repos": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  },
+  "package_integrity": {
+    "bash_count": 2,
+    "rust_count": 2,
+    "diffs": []
+  },
+  "typosquatting": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  },
+  "network_exfiltration": {
+    "bash_count": 0,
+    "rust_count": 0,
+    "diffs": []
+  }
+}

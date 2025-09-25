@@ -1,0 +1,159 @@
+[0;34m📦 Loaded 621 compromised packages from /c/Users/gstra/Code/shai-hulud-detect-rs/compromised-packages.txt[0m
+[0;32mStarting Shai-Hulud detection scan...[0m
+[0;34mScanning directory: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases[0m
+
+[0;34m🔍 Checking for malicious workflow files...[0m
+[0;34m🔍 Checking 32 files for known malicious content...[0m
+[K1 / 32 checked (3 %)[K2 / 32 checked (6 %)[K3 / 32 checked (9 %)[K4 / 32 checked (12 %)[K5 / 32 checked (15 %)[K6 / 32 checked (18 %)[K7 / 32 checked (21 %)[K8 / 32 checked (25 %)[K9 / 32 checked (28 %)[K10 / 32 checked (31 %)[K11 / 32 checked (34 %)[K12 / 32 checked (37 %)[K13 / 32 checked (40 %)[K14 / 32 checked (43 %)[K15 / 32 checked (46 %)[K16 / 32 checked (50 %)[K17 / 32 checked (53 %)[K18 / 32 checked (56 %)[K19 / 32 checked (59 %)[K20 / 32 checked (62 %)[K21 / 32 checked (65 %)[K22 / 32 checked (68 %)[K23 / 32 checked (71 %)[K24 / 32 checked (75 %)[K25 / 32 checked (78 %)[K26 / 32 checked (81 %)[K27 / 32 checked (84 %)[K28 / 32 checked (87 %)[K29 / 32 checked (90 %)[K30 / 32 checked (93 %)[K31 / 32 checked (96 %)[K32 / 32 checked (100 %)[K[0;34m🔍 Checking 11 package.json files for compromised packages...[0m
+[K1 / 11 checked (9 %)[K2 / 11 checked (18 %)[K3 / 11 checked (27 %)[K4 / 11 checked (36 %)[K5 / 11 checked (45 %)[K6 / 11 checked (54 %)[K7 / 11 checked (63 %)[K8 / 11 checked (72 %)[K9 / 11 checked (81 %)[K10 / 11 checked (90 %)[K11 / 11 checked (100 %)[K[0;34m🔍 Checking for suspicious postinstall hooks...[0m
+[0;34m🔍 Checking for suspicious content patterns...[0m
+[0;34m🔍 Checking for cryptocurrency theft patterns...[0m
+[0;34m🔍 Checking for Trufflehog activity and secret scanning...[0m
+[0;34m🔍 Checking for suspicious git branches...[0m
+[0;34m🔍 Checking for Shai-Hulud repositories and migration patterns...[0m
+[0;34m🔍 Checking package lock files for integrity issues...[0m
+
+[0;34m==============================================[0m
+[0;34m      SHAI-HULUD DETECTION REPORT[0m
+[0;34m==============================================[0m
+
+[0;31m🚨 HIGH RISK: Malicious workflow files detected:[0m
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/.github/workflows/shai-hulud-workflow.yml
+   [0;34m┌─ File: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/.github/workflows/shai-hulud-workflow.yml[0m
+   [0;34m│  Context: HIGH RISK: Known malicious workflow filename[0m
+   [0;34m└─[0m
+
+[1;33m⚠️  MEDIUM RISK: Suspicious content patterns:[0m
+   - Pattern: webhook.site reference
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/.github/workflows/shai-hulud-workflow.yml
+   - Pattern: malicious webhook endpoint
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/.github/workflows/shai-hulud-workflow.yml
+   - Pattern: webhook.site reference
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/actual-credential-harvester.js
+   - Pattern: malicious webhook endpoint
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/actual-credential-harvester.js
+   - Pattern: webhook.site reference
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/malicious.js
+   - Pattern: malicious webhook endpoint
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/malicious.js
+   - Pattern: webhook.site reference
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/package-with-postinstall.json
+   - Pattern: malicious webhook endpoint
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/package-with-postinstall.json
+   - Pattern: webhook.site reference
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/mixed-project/suspicious.js
+   - Pattern: webhook.site reference
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/network-exfiltration-project/malicious.js
+   - Pattern: malicious webhook endpoint
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/network-exfiltration-project/malicious.js
+   [1;33mNOTE: Manual review required to determine if these are malicious.[0m
+
+[0;31m🚨 HIGH RISK: Cryptocurrency theft patterns detected:[0m
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/malicious-chalk.js:XMLHttpRequest prototype modification detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/malicious-chalk.js:Known attacker wallet address detected - HIGH RISK
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/obfuscated-payload.js:Known attacker wallet address detected - HIGH RISK
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:XMLHttpRequest prototype modification detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Known attacker wallet address detected - HIGH RISK
+   [0;31mNOTE: These patterns strongly indicate crypto theft malware from the September 8 attack.[0m
+   [0;31mImmediate investigation and remediation required.[0m
+
+[1;33m⚠️  MEDIUM RISK: Potential cryptocurrency manipulation patterns:[0m
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/malicious-chalk.js:Ethereum wallet address patterns detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/malicious-chalk.js:Known crypto theft function names detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/malicious-chalk.js:Phishing domain npmjs.help detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/malicious-chalk.js:Cryptocurrency regex patterns detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/obfuscated-payload.js:Ethereum wallet address patterns detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/obfuscated-payload.js:Phishing domain npmjs.help detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/chalk-debug-attack/obfuscated-payload.js:JavaScript obfuscation detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/common-crypto-libs/ethers-usage.js:Ethereum wallet address patterns detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Ethereum wallet address patterns detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Phishing domain npmjs.help detected
+   - /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/legitimate-crypto/wallet-utils.js:Ethereum wallet address patterns detected
+   [1;33mNOTE: These may be legitimate crypto tools or framework code.[0m
+   [1;33mManual review recommended to determine if they are malicious.[0m
+
+[0;31m🚨 HIGH RISK: Trufflehog/secret scanning activity detected:[0m
+   - Activity: Trufflehog binary found
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/malicious-trufflehog-wrapper.sh
+   [0;34m┌─ File: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/malicious-trufflehog-wrapper.sh[0m
+   [0;34m│  Context: HIGH RISK: Trufflehog binary found[0m
+   [0;34m└─[0m
+
+   - Activity: Trufflehog binary found
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/trufflehog-script.sh
+   [0;34m┌─ File: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/trufflehog-script.sh[0m
+   [0;34m│  Context: HIGH RISK: Trufflehog binary found[0m
+   [0;34m└─[0m
+
+   - Activity: Credential patterns with potential exfiltration
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/malicious-trufflehog-wrapper.sh
+   [0;34m┌─ File: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/malicious-trufflehog-wrapper.sh[0m
+   [0;34m│  Context: HIGH RISK: Credential patterns with potential exfiltration[0m
+   [0;34m└─[0m
+
+   - Activity: Environment scanning with exfiltration
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/network-exfiltration-project/malicious.js
+   [0;34m┌─ File: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/network-exfiltration-project/malicious.js[0m
+   [0;34m│  Context: HIGH RISK: Environment scanning with exfiltration[0m
+   [0;34m└─[0m
+
+   [0;31mNOTE: These patterns indicate likely malicious credential harvesting.[0m
+   [0;31mImmediate investigation and remediation required.[0m
+
+[1;33m⚠️  MEDIUM RISK: Potentially suspicious secret scanning patterns:[0m
+   - Pattern: Contains credential scanning patterns
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/false-positive-project/express-server.js
+   - Pattern: Contains credential scanning patterns
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/actual-credential-harvester.js
+   - Pattern: Potentially suspicious environment variable access
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/actual-credential-harvester.js
+   - Pattern: Contains trufflehog references in source code
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/malicious-trufflehog-wrapper.sh
+   - Pattern: Contains trufflehog references in source code
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/trufflehog-script.sh
+   - Pattern: Contains credential scanning patterns
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/trufflehog-script.sh
+   - Pattern: Potentially suspicious environment variable access
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/trufflehog-script.sh
+   - Pattern: Contains trufflehog references in source code
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/legitimate-security-project/security-scanner.py
+   - Pattern: Contains credential scanning patterns
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/legitimate-security-project/security-scanner.py
+   - Pattern: Potentially suspicious environment variable access
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/legitimate-security-project/security-scanner.py
+   [1;33mNOTE: These may be legitimate security tools or framework code.[0m
+   [1;33mManual review recommended to determine if they are malicious.[0m
+
+[1;33m⚠️  MEDIUM RISK: Packages from compromised namespaces:[0m
+   - Warning: Contains packages from compromised namespace: @ctrl
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/clean-project/package.json
+   - Warning: Contains packages from compromised namespace: @ctrl
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/package.json
+   - Warning: Contains packages from compromised namespace: @nativescript-community
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/package.json
+   - Warning: Contains packages from compromised namespace: @ctrl
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/mixed-project/package.json
+   [1;33mNOTE: These namespaces have been compromised but specific versions may vary.[0m
+   [1;33mCheck package versions against known compromise lists.[0m
+
+[1;33m⚠️  MEDIUM RISK: Package integrity issues detected:[0m
+   - Issue: Recently modified lockfile contains @ctrl packages (potential worm activity)
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-lockfile/package-lock.json
+   - Issue: Recently modified lockfile contains @ctrl packages (potential worm activity)
+     Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-lockfile-pnpm/pnpm-lock.yaml
+   [1;33mNOTE: These issues may indicate tampering with package dependencies.[0m
+   [1;33mVerify package versions and regenerate lockfiles if necessary.[0m
+
+[0;34m==============================================[0m
+[0;31m🔍 SUMMARY:[0m
+[0;31m   High Risk Issues: 10[0m
+[1;33m   Medium Risk Issues: 38[0m
+[0;34m   Total Critical Issues: 48[0m
+
+[1;33m⚠️  IMPORTANT:[0m
+[1;33m   - High risk issues likely indicate actual compromise[0m
+[1;33m   - Medium risk issues require manual investigation[0m
+[1;33m   - Low risk issues are likely false positives from legitimate code[0m
+[1;33m   - Consider running additional security scans[0m
+[1;33m   - Review your npm audit logs and package history[0m
+[0;34m==============================================[0m

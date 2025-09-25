@@ -1,0 +1,59 @@
+{
+  "findings": [
+    {
+      "path": "test-cases/infected-project/crypto-theft.js",
+      "severity": "HIGH",
+      "message": "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:XMLHttpRequest prototype modification detected"
+    },
+    {
+      "path": "test-cases/infected-project/crypto-theft.js",
+      "severity": "HIGH",
+      "message": "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Known attacker wallet address detected - HIGH RISK"
+    },
+    {
+      "path": "test-cases/infected-project/crypto-theft.js",
+      "severity": "MEDIUM",
+      "message": "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Ethereum wallet address patterns detected"
+    },
+    {
+      "path": "test-cases/infected-project/crypto-theft.js",
+      "severity": "MEDIUM",
+      "message": "- /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/crypto-theft.js:Phishing domain npmjs.help detected"
+    },
+    {
+      "path": "test-cases/clean-project/package.js",
+      "severity": "MEDIUM",
+      "message": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/clean-project/package.json"
+    },
+    {
+      "path": "test-cases/infected-project/package.js",
+      "severity": "MEDIUM",
+      "message": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/package.json"
+    },
+    {
+      "path": "test-cases/infected-project/package.js",
+      "severity": "MEDIUM",
+      "message": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-project/package.json"
+    },
+    {
+      "path": "test-cases/mixed-project/package.js",
+      "severity": "MEDIUM",
+      "message": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/mixed-project/package.json"
+    },
+    {
+      "path": "test-cases/infected-lockfile/package-lock.js",
+      "severity": "MEDIUM",
+      "message": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-lockfile/package-lock.json"
+    },
+    {
+      "path": "test-cases/infected-lockfile-pnpm/pnpm-lock.yaml",
+      "severity": "MEDIUM",
+      "message": "Found in: /c/Users/gstra/Code/shai-hulud-detect-rs/test-cases/infected-lockfile-pnpm/pnpm-lock.yaml"
+    }
+  ],
+  "summary": {
+    "high": 10,
+    "medium": 38,
+    "low": 0
+  }
+}
