@@ -24,6 +24,7 @@ clap = { version = "4", features = ["derive"] }
 hex = "0.4"
 num_cpus = "1.17"
 tempfile = "3"
+lazy_static = "1.4"
 
 [dev-dependencies]
 assert_matches = "1.5"

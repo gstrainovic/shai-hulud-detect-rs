@@ -3,37 +3,86 @@
 use anyhow::Result;
 use rayon::prelude::*;
 use regex::Regex;
+use serde_json::Value as JsonValue;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use serde_json::Value as JsonValue;
+#[macro_use]
+extern crate lazy_static;
+lazy_static! {
+    static ref RE_PKG_SIMPLE: Regex = Regex::new(r"^[a-zA-Z@][^:]+:[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+    static ref RE_POSTINSTALL: Regex = Regex::new(r#"postinstall"\s*:\s*"([^"]+)"#).unwrap();
+    static ref RE_WEBHOOK: Regex = Regex::new(r"webhook\.site").unwrap();
+    static ref RE_UUID: Regex = Regex::new(r"bb8ca5f6-4175-45d2-b042-fc9ebb8170b7").unwrap();
+    static ref RE_ETH_ADDR: Regex = Regex::new(r"0x[a-fA-F0-9]{40}").unwrap();
+    static ref RE_XMLHTTPPROT: Regex = Regex::new(r"XMLHttpRequest\\.prototype\\.send").unwrap();
+    static ref RE_KNOWN_CRYPTO: Regex = Regex::new(r"checkethereumw|runmask|newdlocal|_0x19ca67").unwrap();
+    static ref RE_ATT_WALLETS: Regex = Regex::new(r"0xFc4a4858bafef54D1b1d7697bfb5c52F4c166976|1H13VnQJKtT4HjD5ZFKaaiZEetMbG7nDHx|TB9emsCq6fQw6wRk4HBxxNnU6Hwt1DnV67").unwrap();
+    static ref RE_PHISHING: Regex = Regex::new(r"npmjs\.help").unwrap();
+    static ref RE_OBF: Regex = Regex::new(r"javascript-obfuscator").unwrap();
+    static ref RE_ETH_KEYWORDS: Regex = Regex::new(r"ethereum|wallet|address|crypto").unwrap();
+    static ref RE_CRED_KEYS: Regex = Regex::new(r"AWS_ACCESS_KEY|GITHUB_TOKEN|NPM_TOKEN").unwrap();
+    static ref RE_PROCESS_ENV: Regex = Regex::new(r"process\.env|os\.environ|getenv").unwrap();
+    static ref RE_INTEGRITY: Regex = Regex::new(r#"integrity": "sha[0-9]+-[A-Za-z0-9+/=]*"#).unwrap();
+    static ref RE_DEPS_BLOCK: Regex = Regex::new(r#""dependencies""\s*:\s*\{([\s\S]*?)\}"#).unwrap();
+    static ref RE_DEP_NAME: Regex = Regex::new(r#""\s*([a-zA-Z@][^"\s]+)"\s*:"#).unwrap();
+    static ref RE_IP: Regex = Regex::new(r"[0-9]{1,3}(\.[0-9]{1,3}){3}").unwrap();
+    static ref RE_WSS: Regex = Regex::new(r#"wss?://[^"'\s]*"#).unwrap();
+    static ref RE_NETWORK_CALLS: Regex = Regex::new(r"(fetch|XMLHttpRequest|axios)").unwrap();
+    static ref RE_AUTH_HEADER: Regex = Regex::new(r"(Authorization:|Basic |Bearer )").unwrap();
+    // additional precompiled regexes
+    static ref RE_CRYPTO_SNIPPET: Regex = Regex::new(r"ethereum.*0x\[a-fA-F0-9\]|bitcoin.*\[13\]\[a-km-zA-HJ-NP-Z1-9\]").unwrap();
+}
 
 // Load compromised packages from a file
 fn load_compromised_packages() -> Result<Vec<String>, anyhow::Error> {
-    let packages_file = Path::new("compromised-packages.txt");
-    if !packages_file.exists() {
-        anyhow::bail!("compromised-packages.txt not found");
+    fn read_list(path: &Path) -> Result<Vec<String>, anyhow::Error> {
+        let content = fs::read_to_string(path)?;
+        let mut packages = Vec::new();
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('#') || line.is_empty() {
+                continue;
+            }
+            if RE_PKG_SIMPLE.is_match(line) {
+                packages.push(line.to_string());
+            }
+        }
+        Ok(packages)
     }
 
-    let content = fs::read_to_string(packages_file)?;
-    let mut packages = Vec::new();
-    for line in content.lines() {
-        let line = line.trim();
-        if line.starts_with('#') || line.is_empty() {
-            continue;
-        }
-        // Validate simple package:version format like name:1.2.3
-        if Regex::new(r"^[a-zA-Z@][^:]+:[0-9]+\.[0-9]+\.[0-9]+$")
-            .unwrap()
-            .is_match(line)
-        {
-            packages.push(line.to_string());
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(current) = env::current_dir() {
+        candidates.push(current.join("compromised-packages.txt"));
+        if let Some(parent) = current.parent() {
+            candidates.push(parent.join("compromised-packages.txt"));
         }
     }
 
-    Ok(packages)
+    if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+        let manifest = PathBuf::from(manifest_dir);
+        candidates.push(manifest.join("compromised-packages.txt"));
+        if let Some(parent) = manifest.parent() {
+            candidates.push(parent.join("compromised-packages.txt"));
+        }
+    }
+
+    for candidate in candidates {
+        if candidate.exists() {
+            return read_list(&candidate);
+        }
+    }
+
+    let fallback = Path::new("compromised-packages.txt");
+    if fallback.exists() {
+        return read_list(fallback);
+    }
+
+    anyhow::bail!("compromised-packages.txt not found");
 }
 
 pub struct Scanner {
@@ -43,9 +92,15 @@ pub struct Scanner {
     pub parallelism: usize,
 }
 
+impl Default for Scanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scanner {
     pub fn new() -> Self {
-        let mut compromised_namespaces = vec![
+        let compromised_namespaces = vec![
             "@crowdstrike".to_string(),
             "@art-ws".to_string(),
             "@ngx".to_string(),
@@ -173,13 +228,19 @@ impl Scanner {
                             let malicious_version = parts.next().unwrap_or("");
 
                             // check dependencies and devDependencies
-                            for dep_key in ["dependencies", "devDependencies", "peerDependencies"].iter() {
+                            for dep_key in
+                                ["dependencies", "devDependencies", "peerDependencies"].iter()
+                            {
                                 if let Some(deps) = root.get(*dep_key).and_then(|d| d.as_object()) {
                                     if let Some(v) = deps.get(package_name) {
                                         let vstr = v.as_str().unwrap_or("");
                                         // strip semver operators like ^ ~ >= etc. for simple comparison
-                                        let ver = vstr.trim().trim_start_matches(|c: char| c == '^' || c == '~' || c == '>');
-                                        if ver.starts_with(malicious_version) || ver == malicious_version {
+                                        let ver = vstr.trim().trim_start_matches(|c: char| {
+                                            c == '^' || c == '~' || c == '>'
+                                        });
+                                        if ver.starts_with(malicious_version)
+                                            || ver == malicious_version
+                                        {
                                             findings.push((
                                                 path.clone(),
                                                 format!("{}@{}", package_name, malicious_version),
@@ -193,11 +254,20 @@ impl Scanner {
                         }
 
                         // Check for compromised namespaces by iterating dependency keys
-                        for dep_section in ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"].iter() {
+                        for dep_section in [
+                            "dependencies",
+                            "devDependencies",
+                            "peerDependencies",
+                            "optionalDependencies",
+                        ]
+                        .iter()
+                        {
                             if let Some(deps) = root.get(*dep_section).and_then(|d| d.as_object()) {
                                 for key in deps.keys() {
                                     for namespace in &self.compromised_namespaces {
-                                        if key.starts_with(namespace) && !added_namespaces.contains(namespace) {
+                                        if key.starts_with(namespace)
+                                            && !added_namespaces.contains(namespace)
+                                        {
                                             findings.push((
                                                 path.clone(),
                                                 format!("Contains packages from compromised namespace: {}", namespace),
@@ -230,8 +300,7 @@ impl Scanner {
                 if let Ok(content) = fs::read_to_string(&path) {
                     if content.contains("\"postinstall\"") {
                         // crude extraction
-                        let post_re = Regex::new(r#"postinstall"\s*:\s*"([^"]+)"#).unwrap();
-                        if let Some(caps) = post_re.captures(&content) {
+                        if let Some(caps) = RE_POSTINSTALL.captures(&content) {
                             let cmd = caps.get(1).map(|m| m.as_str()).unwrap_or("");
                             if cmd.contains("curl")
                                 || cmd.contains("wget")
@@ -253,8 +322,8 @@ impl Scanner {
 
     pub fn check_content(&self, scan_dir: &Path) -> Result<Vec<(PathBuf, String)>> {
         let mut findings = Vec::new();
-        let re_webhook = Regex::new(r"webhook\.site").unwrap();
-        let re_uuid = Regex::new(r"bb8ca5f6-4175-45d2-b042-fc9ebb8170b7").unwrap();
+        let re_webhook = &*RE_WEBHOOK;
+        let re_uuid = &*RE_UUID;
 
         for entry in WalkDir::new(scan_dir).into_iter().filter_map(Result::ok) {
             if entry.file_type().is_file() {
@@ -280,12 +349,12 @@ impl Scanner {
 
     pub fn check_crypto_theft_patterns(&self, scan_dir: &Path) -> Result<Vec<(PathBuf, String)>> {
         let mut findings = Vec::new();
-        let re_eth_addr = Regex::new(r"0x[a-fA-F0-9]{40}").unwrap();
-        let re_xmlhttpprot = Regex::new(r"XMLHttpRequest\.prototype\.send").unwrap();
-        let re_known = Regex::new(r"checkethereumw|runmask|newdlocal|_0x19ca67").unwrap();
-        let re_attacker_wallets = Regex::new(r"0xFc4a4858bafef54D1b1d7697bfb5c52F4c166976|1H13VnQJKtT4HjD5ZFKaaiZEetMbG7nDHx|TB9emsCq6fQw6wRk4HBxxNnU6Hwt1DnV67").unwrap();
-        let re_phishing = Regex::new(r"npmjs\.help").unwrap();
-        let re_obf = Regex::new(r"javascript-obfuscator").unwrap();
+        let re_eth_addr = &*RE_ETH_ADDR;
+        let re_xmlhttpprot = &*RE_XMLHTTPPROT;
+        let re_known = &*RE_KNOWN_CRYPTO;
+        let re_attacker_wallets = &*RE_ATT_WALLETS;
+        let re_phishing = &*RE_PHISHING;
+        let re_obf = &*RE_OBF;
 
         for entry in WalkDir::new(scan_dir).into_iter().filter_map(Result::ok) {
             if entry.file_type().is_file() {
@@ -293,10 +362,7 @@ impl Scanner {
                     if ["js", "ts", "json"].contains(&ext) {
                         if let Ok(content) = fs::read_to_string(entry.path()) {
                             let p = entry.path().to_path_buf();
-                            if re_eth_addr.is_match(&content)
-                                && Regex::new(r"ethereum|wallet|address|crypto")
-                                    .unwrap()
-                                    .is_match(&content)
+                            if re_eth_addr.is_match(&content) && RE_ETH_KEYWORDS.is_match(&content)
                             {
                                 findings.push((
                                     p.clone(),
@@ -334,12 +400,7 @@ impl Scanner {
                                     "JavaScript obfuscation detected".to_string(),
                                 ));
                             }
-                            if Regex::new(
-                                r"ethereum.*0x\[a-fA-F0-9\]|bitcoin.*\[13\]\[a-km-zA-HJ-NP-Z1-9\]",
-                            )
-                            .unwrap()
-                            .is_match(&content)
-                            {
+                            if RE_CRYPTO_SNIPPET.is_match(&content) {
                                 findings.push((
                                     p.clone(),
                                     "Cryptocurrency regex patterns detected".to_string(),
@@ -420,10 +481,7 @@ impl Scanner {
                                 }
                             }
 
-                            if Regex::new(r"AWS_ACCESS_KEY|GITHUB_TOKEN|NPM_TOKEN")
-                                .unwrap()
-                                .is_match(&content)
-                            {
+                            if RE_CRED_KEYS.is_match(&content) {
                                 let context = Self::get_file_context(&p);
                                 match context.as_str() {
                                     "type_definitions" | "documentation" => continue,
@@ -470,10 +528,7 @@ impl Scanner {
                                 }
                             }
 
-                            if Regex::new(r"process\.env|os\.environ|getenv")
-                                .unwrap()
-                                .is_match(&content)
-                            {
+                            if RE_PROCESS_ENV.is_match(&content) {
                                 let context = Self::get_file_context(&p);
                                 match context.as_str() {
                                     "type_definitions" | "documentation" => continue,
@@ -500,13 +555,12 @@ impl Scanner {
                                                 "Environment scanning with exfiltration"
                                                     .to_string(),
                                             ));
-                                        } else if sample.contains("scan")
+                                        } else if (sample.contains("scan")
                                             || sample.contains("harvest")
-                                            || sample.contains("steal")
+                                            || sample.contains("steal"))
+                                            && !Self::is_legitimate_pattern(&p, &content)
                                         {
-                                            if !Self::is_legitimate_pattern(&p, &content) {
-                                                findings.push((entry.path().to_path_buf(), "MEDIUM".to_string(), "Potentially suspicious environment variable access".to_string()));
-                                            }
+                                            findings.push((entry.path().to_path_buf(), "MEDIUM".to_string(), "Potentially suspicious environment variable access".to_string()));
                                         }
                                     }
                                 }
@@ -634,9 +688,7 @@ impl Scanner {
                                 }
                             }
 
-                            let suspicious_hashes =
-                                Regex::new(r#"integrity": "sha[0-9]+-[A-Za-z0-9+/=]*"#).unwrap();
-                            let count = suspicious_hashes.find_iter(&content).count();
+                            let count = RE_INTEGRITY.find_iter(&content).count();
                             if count > 0 {
                                 findings.push((
                                     org_file.clone(),
@@ -702,14 +754,11 @@ impl Scanner {
                 let path = entry.into_path();
                 if let Ok(content) = fs::read_to_string(&path) {
                     // extract package names from dependencies sections crudely
-                    let deps_re = Regex::new(r#""dependencies""\s*:\s*\{([\s\S]*?)\}"#).unwrap();
+                    let deps_re = &*RE_DEPS_BLOCK;
                     if let Some(caps) = deps_re.captures(&content) {
                         let block = caps.get(1).map(|m| m.as_str()).unwrap_or("");
                         for line in block.lines() {
-                            if let Some(name_caps) = Regex::new(r#""\s*([a-zA-Z@][^"\s]+)"\s*:"#)
-                                .unwrap()
-                                .captures(line)
-                            {
+                            if let Some(name_caps) = RE_DEP_NAME.captures(line) {
                                 let package_name =
                                     name_caps.get(1).map(|m| m.as_str()).unwrap_or("");
                                 if package_name.len() < 2 {
@@ -798,7 +847,7 @@ impl Scanner {
                                                     .zip(sus_clean.chars())
                                                     .filter(|(a, b)| a != b)
                                                     .count();
-                                                if ns_diff >= 1 && ns_diff <= 2 {
+                                                if (1..=2).contains(&ns_diff) {
                                                     findings.push((path.clone(), format!("Suspicious namespace variation: {} (similar to {})", namespace, suspicious)));
                                                 }
                                             }
@@ -847,20 +896,14 @@ impl Scanner {
                         if let Ok(content) = fs::read_to_string(entry.path()) {
                             if !entry.path().to_string_lossy().contains("/vendor/")
                                 && !entry.path().to_string_lossy().contains("/node_modules/")
+                                && RE_IP.is_match(&content)
+                                && !content.contains("127.0.0.1")
+                                && !content.contains("0.0.0.0")
                             {
-                                if Regex::new(r"[0-9]{1,3}(\.[0-9]{1,3}){3}")
-                                    .unwrap()
-                                    .is_match(&content)
-                                {
-                                    if !content.contains("127.0.0.1")
-                                        && !content.contains("0.0.0.0")
-                                    {
-                                        findings.push((
-                                            entry.path().to_path_buf(),
-                                            "Hardcoded IP addresses found".to_string(),
-                                        ));
-                                    }
-                                }
+                                findings.push((
+                                    entry.path().to_path_buf(),
+                                    "Hardcoded IP addresses found".to_string(),
+                                ));
                             }
                             if !entry.path().to_string_lossy().contains("package-lock.json")
                                 && !entry.path().to_string_lossy().contains("yarn.lock")
@@ -884,13 +927,12 @@ impl Scanner {
 
                             if !entry.path().to_string_lossy().contains("/vendor/")
                                 && !entry.path().to_string_lossy().contains("/node_modules/")
+                                && (content.contains("atob(") || content.contains("base64"))
                             {
-                                if content.contains("atob(") || content.contains("base64") {
-                                    findings.push((
-                                        entry.path().to_path_buf(),
-                                        "Base64 decoding detected".to_string(),
-                                    ));
-                                }
+                                findings.push((
+                                    entry.path().to_path_buf(),
+                                    "Base64 decoding detected".to_string(),
+                                ));
                             }
 
                             if content.contains("dns-query")
@@ -903,10 +945,7 @@ impl Scanner {
                             }
 
                             if content.contains("wss://") || content.contains("ws://") {
-                                for cap in Regex::new(r#"wss?://[^"'\s]*"#)
-                                    .unwrap()
-                                    .find_iter(&content)
-                                {
+                                for cap in RE_WSS.find_iter(&content) {
                                     let endpoint = cap.as_str();
                                     if !endpoint.contains("localhost")
                                         && !endpoint.contains("127.0.0.1")
@@ -935,24 +974,14 @@ impl Scanner {
                             if !entry.path().to_string_lossy().contains("/vendor/")
                                 && !entry.path().to_string_lossy().contains("/node_modules/")
                                 && !entry.path().to_string_lossy().contains(".min.js")
+                                && content.contains("btoa(")
+                                && RE_NETWORK_CALLS.is_match(&content)
+                                && !RE_AUTH_HEADER.is_match(&content)
                             {
-                                if content.contains("btoa(") {
-                                    if Regex::new(r"(fetch|XMLHttpRequest|axios)")
-                                        .unwrap()
-                                        .is_match(&content)
-                                    {
-                                        if !Regex::new(r"(Authorization:|Basic |Bearer )")
-                                            .unwrap()
-                                            .is_match(&content)
-                                        {
-                                            findings.push((
-                                                entry.path().to_path_buf(),
-                                                "Suspicious base64 encoding near network operation"
-                                                    .to_string(),
-                                            ));
-                                        }
-                                    }
-                                }
+                                findings.push((
+                                    entry.path().to_path_buf(),
+                                    "Suspicious base64 encoding near network operation".to_string(),
+                                ));
                             }
                         }
                     }

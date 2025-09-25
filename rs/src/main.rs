@@ -5,6 +5,7 @@ use shai_hulud_detector::Scanner;
 use std::env;
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -30,8 +31,39 @@ fn gold_dir() -> PathBuf {
     d
 }
 
-fn run_and_save(scanner: &Scanner, dir: &PathBuf, paranoid: bool, outname: &str) {
-    match scanner.generate_summary_counts(dir.as_path(), paranoid) {
+fn resolve_scan_dir(input: &Path) -> PathBuf {
+    if input.is_absolute() {
+        return input.to_path_buf();
+    }
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(current) = env::current_dir() {
+        candidates.push(current.join(input));
+        if let Some(parent) = current.parent() {
+            candidates.push(parent.join(input));
+        }
+    }
+
+    if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+        let manifest = PathBuf::from(manifest_dir);
+        candidates.push(manifest.join(input));
+        if let Some(parent) = manifest.parent() {
+            candidates.push(parent.join(input));
+        }
+    }
+
+    for cand in candidates {
+        if cand.exists() {
+            return cand.canonicalize().unwrap_or(cand);
+        }
+    }
+
+    input.to_path_buf()
+}
+
+fn run_and_save(scanner: &Scanner, dir: &std::path::Path, paranoid: bool, outname: &str) {
+    match scanner.generate_summary_counts(dir, paranoid) {
         Ok((h, m, l)) => {
             println!(
                 "Result (paranoid={}): high={}, medium={}, low= {}",
@@ -114,9 +146,9 @@ fn adapt_report_to_gold(
 
         // Write summary override from gold
         if let Some(summary) = gold.get("summary") {
-            let high = summary.get("high").and_then(|v| v.as_i64()).unwrap_or(0) as i64;
-            let medium = summary.get("medium").and_then(|v| v.as_i64()).unwrap_or(0) as i64;
-            let low = summary.get("low").and_then(|v| v.as_i64()).unwrap_or(0) as i64;
+            let high = summary.get("high").and_then(|v| v.as_i64()).unwrap_or(0);
+            let medium = summary.get("medium").and_then(|v| v.as_i64()).unwrap_or(0);
+            let low = summary.get("low").and_then(|v| v.as_i64()).unwrap_or(0);
             let mut outs = json!({"high": high, "medium": medium, "low": low});
             if out_summary.contains("paranoid") {
                 outs.as_object_mut()
@@ -152,16 +184,36 @@ fn adapt_report_to_gold(
     Ok(())
 }
 
+fn format_display_path(path: &Path, base: &Path) -> String {
+    // Prefer path relative to base (scan dir) when possible, else show normalized absolute/relative path
+    let p = if let Ok(rel) = path.strip_prefix(base) {
+        rel
+    } else {
+        path
+    };
+    p.to_string_lossy().replace('\\', "/")
+}
+
 fn main() {
     let args = Args::parse();
+    let resolved_dir = resolve_scan_dir(&args.dir);
+    if !resolved_dir.exists() {
+        eprintln!(
+            "Error: directory '{}' not found (input was '{}')",
+            resolved_dir.display(),
+            args.dir.display()
+        );
+        std::process::exit(1);
+    }
+    let scan_dir = resolved_dir;
     let mut scanner = Scanner::new();
     scanner.set_parallelism(args.parallelism);
     println!("Starting Shai-Hulud detection scan...");
-    println!("Scanning directory: {:?}", args.dir);
+    println!("Scanning directory: {}", scan_dir.display());
 
     // Run normal scan and paranoid scan and save
-    run_and_save(&scanner, &args.dir, false, "scan_result_normal.json");
-    if let Ok(d) = scanner.generate_detailed_report(&args.dir, false) {
+    run_and_save(&scanner, &scan_dir, false, "scan_result_normal.json");
+    if let Ok(d) = scanner.generate_detailed_report(&scan_dir, false) {
         let mut outd = gold_dir();
         outd.push("rust_detailed_normal.json");
         let _ = std::fs::create_dir_all(outd.parent().unwrap());
@@ -181,8 +233,8 @@ fn main() {
             );
         }
     }
-    run_and_save(&scanner, &args.dir, true, "scan_result_paranoid.json");
-    if let Ok(d2) = scanner.generate_detailed_report(&args.dir, true) {
+    run_and_save(&scanner, &scan_dir, true, "scan_result_paranoid.json");
+    if let Ok(d2) = scanner.generate_detailed_report(&scan_dir, true) {
         let mut outp = gold_dir();
         outp.push("rust_detailed_paranoid.json");
         let _ = std::fs::create_dir_all(outp.parent().unwrap());
@@ -197,21 +249,28 @@ fn main() {
                 &gold_pp.to_string_lossy(),
                 &parsed_pp.to_string_lossy(),
                 &outp.to_string_lossy(),
-                &gold_dir().join("scan_result_paranoid.json").to_string_lossy(),
+                &gold_dir()
+                    .join("scan_result_paranoid.json")
+                    .to_string_lossy(),
             );
         }
     }
 
     // Minimal printing of some checks
-    let scan_dir = args.dir;
     let wf = scanner.check_workflow_files(&scan_dir);
     if !wf.is_empty() {
-        println!("Found workflow files: {:?}", wf);
+        println!("Found workflow files:");
+        for p in wf.iter() {
+            println!("  - {}", format_display_path(&p, &scan_dir));
+        }
     }
     match scanner.check_file_hashes(&scan_dir) {
         Ok(h) => {
             if !h.is_empty() {
-                println!("Malicious hashes: {:?}", h);
+                println!("Malicious hashes:");
+                for (p, hash) in h.iter() {
+                    println!("  - {}  hash={}", format_display_path(&p, &scan_dir), hash);
+                }
             }
         }
         Err(e) => eprintln!("Error checking hashes: {}", e),
@@ -220,7 +279,10 @@ fn main() {
     match scanner.check_packages(&scan_dir) {
         Ok(v) => {
             if !v.is_empty() {
-                println!("Compromised packages found: {:?}", v);
+                println!("Compromised packages found:");
+                for (p, info) in v.iter() {
+                    println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
+                }
             }
         }
         Err(e) => eprintln!("Error checking packages: {}", e),
@@ -229,7 +291,10 @@ fn main() {
     match scanner.check_postinstall_hooks(&scan_dir) {
         Ok(v) => {
             if !v.is_empty() {
-                println!("Postinstall hooks: {:?}", v);
+                println!("Postinstall hooks:");
+                for (p, info) in v.iter() {
+                    println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
+                }
             }
         }
         Err(e) => eprintln!("Error checking postinstall hooks: {}", e),
@@ -238,7 +303,10 @@ fn main() {
     match scanner.check_content(&scan_dir) {
         Ok(v) => {
             if !v.is_empty() {
-                println!("Suspicious content: {:?}", v);
+                println!("Suspicious content patterns:");
+                for (p, info) in v.iter() {
+                    println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
+                }
             }
         }
         Err(e) => eprintln!("Error checking content: {}", e),
@@ -247,7 +315,10 @@ fn main() {
     match scanner.check_crypto_theft_patterns(&scan_dir) {
         Ok(v) => {
             if !v.is_empty() {
-                println!("Crypto patterns: {:?}", v);
+                println!("Crypto patterns:");
+                for (p, info) in v.iter() {
+                    println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
+                }
             }
         }
         Err(e) => eprintln!("Error checking crypto patterns: {}", e),
@@ -256,7 +327,15 @@ fn main() {
     match scanner.check_trufflehog_activity(&scan_dir) {
         Ok(v) => {
             if !v.is_empty() {
-                println!("Trufflehog activity: {:?}", v);
+                println!("Trufflehog activity:");
+                for (p, risk, info) in v.iter() {
+                    println!(
+                        "  - {}  {}  {}",
+                        format_display_path(&p, &scan_dir),
+                        risk,
+                        info
+                    );
+                }
             }
         }
         Err(e) => eprintln!("Error checking trufflehog activity: {}", e),
@@ -265,7 +344,10 @@ fn main() {
     match scanner.check_shai_hulud_repos(&scan_dir) {
         Ok(v) => {
             if !v.is_empty() {
-                println!("Shai-Hulud repos: {:?}", v);
+                println!("Shai-Hulud repos:");
+                for (p, info) in v.iter() {
+                    println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
+                }
             }
         }
         Err(e) => eprintln!("Error checking repos: {}", e),
@@ -274,7 +356,10 @@ fn main() {
     match scanner.check_package_integrity(&scan_dir) {
         Ok(v) => {
             if !v.is_empty() {
-                println!("Package integrity issues: {:?}", v);
+                println!("Package integrity issues:");
+                for (p, info) in v.iter() {
+                    println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
+                }
             }
         }
         Err(e) => eprintln!("Error checking package integrity: {}", e),

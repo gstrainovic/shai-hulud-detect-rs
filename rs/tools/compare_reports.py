@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import re
+import hashlib
 from pathlib import Path
 
 # Simple comparator: compares bash text outputs with rust detailed JSON per test-case and per-check
@@ -8,6 +9,7 @@ from pathlib import Path
 # Use the crate (rs/) tests/gold directory as canonical storage for gold files
 CRATE_ROOT = Path(__file__).resolve().parent.parent
 CRATE_GOLD_DIR = CRATE_ROOT / 'tests' / 'gold'
+REPO_ROOT = CRATE_ROOT.parent
 
 def resolve_candidate_path(filename: str) -> Path:
     """Resolve filename relative to the crate tests/gold, crate root, or cwd.
@@ -39,6 +41,36 @@ CHECK_KEYS = [
 
 POSIX_PATH_RE = re.compile(r'(test-cases[\\/.][^\\s]*?\.(?:js|json|sh|yml|yaml|py|lock|txt|md))')
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
+
+def normalize_report_path(raw: str) -> str:
+    if not raw:
+        return ""
+
+    clean = ANSI_RE.sub('', raw).replace('\\', '/').strip()
+
+    if clean.startswith('//?/'):
+        clean = clean[4:]
+    if clean.startswith('?/'):
+        clean = clean[2:]
+
+    if len(clean) >= 4 and clean[0] == '/' and clean[2] == '/' and clean[1].isalpha():
+        clean = f"{clean[1].upper()}:/{clean[3:]}"
+
+    clean = clean.lstrip('./')
+
+    try:
+        path_obj = Path(clean)
+    except Exception:
+        return clean
+
+    if path_obj.is_absolute():
+        for base in (REPO_ROOT, CRATE_ROOT):
+            try:
+                rel = path_obj.relative_to(base)
+                return rel.as_posix()
+            except ValueError:
+                continue
+    return clean
 
 
 def extract_bash_findings(bash_path: Path):
@@ -73,8 +105,7 @@ def extract_bash_findings(bash_path: Path):
         m = POSIX_PATH_RE.search(line)
         if m:
             raw = m.group(1)
-            # already cleaned globally; normalize windows backslashes
-            norm = raw.replace('\\', '/').lstrip('./')
+            norm = normalize_report_path(raw)
             # Find section by scanning previous 8 lines for a header
             sect = None
             for j in range(max(0, i-8), i+1):
@@ -101,7 +132,7 @@ def extract_bash_findings(bash_path: Path):
     for sect, mapping in findings.items():
         merged[sect] = {}
         for raw_path, msgs in mapping.items():
-            clean_path = ANSI_RE.sub('', raw_path).replace('\\', '/').lstrip('./')
+            clean_path = normalize_report_path(raw_path)
             merged.setdefault(sect, {}).setdefault(clean_path, [])
             for m in msgs:
                 msg_clean = ANSI_RE.sub('', m).strip()
@@ -126,12 +157,11 @@ def load_rust_json(path: Path):
             p = item.get('path') if isinstance(item, dict) else None
             info = item.get('info') if isinstance(item, dict) else None
             if not p:
-                # for workflow_files array of strings
                 if isinstance(item, str):
                     p = item
                 else:
                     continue
-            norm = p.replace('\\', '/').lstrip('./')
+            norm = normalize_report_path(p)
             normalized[key].setdefault(norm, []).append(info if info else '')
     return normalized
 
@@ -209,6 +239,56 @@ def build_gold_from_bash(bash_path: Path):
     return gold
 
 
+def _normalize_bytes_for_hash(data: bytes) -> bytes:
+    try:
+        text = data.decode('utf-8')
+    except UnicodeDecodeError:
+        return data
+    normalized = text.replace('\r\n', '\n').replace('\r', '\n')
+    return normalized.encode('utf-8')
+
+
+def compute_script_hash(script_path: Path) -> str:
+    if not script_path.exists():
+        return ""
+    data = script_path.read_bytes()
+    return hashlib.sha256(_normalize_bytes_for_hash(data)).hexdigest()
+
+
+def compute_directory_hash(directory: Path) -> str:
+    if not directory.exists() or not directory.is_dir():
+        return ""
+    hasher = hashlib.sha256()
+    for entry in sorted(directory.rglob('*')):
+        if not entry.is_file():
+            continue
+        rel_path = entry.relative_to(directory).as_posix()
+        hasher.update(rel_path.encode('utf-8'))
+        try:
+            data = entry.read_bytes()
+        except OSError:
+            continue
+        hasher.update(hashlib.sha256(_normalize_bytes_for_hash(data)).digest())
+    return hasher.hexdigest()
+
+
+REPO_ROOT = CRATE_ROOT.parent
+SCRIPT_PATH = REPO_ROOT / 'shai-hulud-detector.sh'
+TEST_CASES_PATH = REPO_ROOT / 'test-cases'
+SCRIPT_HASH_FILE = CRATE_GOLD_DIR / '.script_hash'
+
+
+def write_hash_state(script_hash: str, test_cases_hash: str):
+    payload = {
+        'script_sha256': script_hash,
+        'test_cases_sha256': test_cases_hash,
+    }
+    try:
+        SCRIPT_HASH_FILE.write_text(json.dumps(payload, indent=2), encoding='utf-8')
+    except Exception:
+        pass
+
+
 # write comparison JSONs as before
 
 if __name__ == '__main__':
@@ -220,13 +300,21 @@ if __name__ == '__main__':
 
     # write gold JSON
     gold_n = build_gold_from_bash(BASH_NORMAL)
-    # Ensure we always write gold outputs into the crate-local tests/gold folder (rs/tests/gold)
     gold_dir = CRATE_GOLD_DIR
     gold_dir.mkdir(parents=True, exist_ok=True)
     Path(gold_dir / 'bash_gold_normal.json').write_text(json.dumps(gold_n, indent=2, ensure_ascii=False), encoding='utf-8')
 
     # write parsed bash findings for adapter
     Path(gold_dir / 'bash_parsed_normal.json').write_text(json.dumps(bn, indent=2, ensure_ascii=False), encoding='utf-8')
+
+    # write script hash so tests know which bash script produced these gold files
+    try:
+        script_hash = compute_script_hash(SCRIPT_PATH)
+        test_cases_hash = compute_directory_hash(TEST_CASES_PATH)
+        if script_hash or test_cases_hash:
+            write_hash_state(script_hash, test_cases_hash)
+    except Exception:
+        pass
 
     bp = extract_bash_findings(BASH_PARANOID)
     rp = load_rust_json(RUST_PARANOID) if RUST_PARANOID.exists() else {}
@@ -243,4 +331,14 @@ if __name__ == '__main__':
     # Also write the compare reports for programmatic consumption
     Path(gold_dir / 'compare_normal.json').write_text(json.dumps(report_n, indent=2, ensure_ascii=False), encoding='utf-8')
     Path(gold_dir / 'compare_paranoid.json').write_text(json.dumps(report_p, indent=2, ensure_ascii=False), encoding='utf-8')
+
+    # store script hash for paranoid gold as well (overwrite with same value)
+    try:
+        script_hash = compute_script_hash(SCRIPT_PATH)
+        test_cases_hash = compute_directory_hash(TEST_CASES_PATH)
+        if script_hash or test_cases_hash:
+            write_hash_state(script_hash, test_cases_hash)
+    except Exception:
+        pass
+
     print(f"\nWrote gold & compare outputs to {gold_dir}")

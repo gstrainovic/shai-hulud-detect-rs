@@ -4,7 +4,4 @@ target/
 .claude
 scratch
 *.plan
-
-# Keep generated runtime artifacts out of git; do NOT ignore tests/gold so golden outputs can be versioned
-# (examples: rust_detailed_*.json or scan_result_*.json written into tests/gold are committed)
 .env
