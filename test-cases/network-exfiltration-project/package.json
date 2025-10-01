@@ -1,8 +1,0 @@
-{
-  "name": "network-test",
-  "version": "1.0.0",
-  "description": "Test project for network exfiltration detection",
-  "dependencies": {
-    "react": "^18.0.0"
-  }
-}

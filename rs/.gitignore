@@ -1,7 +1,0 @@
-.DS_Store
-*.swp
-target/
-.claude
-scratch
-*.plan
-.env

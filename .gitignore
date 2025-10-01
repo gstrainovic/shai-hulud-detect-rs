@@ -1,6 +1,7 @@
 .DS_Store
 *.swp
-target
+target/
 .claude
 scratch
 *.plan
+.env
