@@ -272,3 +272,88 @@ fn bash_and_rust_parity_per_category() {
         sjson.get("high").is_some() && sjson.get("medium").is_some() && sjson.get("low").is_some()
     );
 }
+
+// Additional test-case specific validations
+use shai_hulud_detector::Scanner;
+
+fn get_test_cases_dir() -> std::path::PathBuf {
+    let crate_root = env::var("CARGO_MANIFEST_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::current_dir().unwrap());
+    let repo_root = crate_root.parent().unwrap_or(&crate_root);
+
+    // Try multiple locations
+    let test_cases = repo_root.join("shai-hulud-detect").join("test-cases");
+    if test_cases.exists() {
+        return test_cases;
+    }
+
+    let test_cases = repo_root.join("test-cases");
+    if test_cases.exists() {
+        return test_cases;
+    }
+
+    // Fallback
+    repo_root.join("test-cases")
+}
+
+#[test]
+fn test_infected_project_counts() {
+    let scanner = Scanner::new();
+    let test_dir = get_test_cases_dir().join("infected-project");
+
+    if !test_dir.exists() {
+        eprintln!("Test directory not found: {}", test_dir.display());
+        return;
+    }
+
+    let (high, medium, _low) = scanner.generate_summary_counts(&test_dir, false).unwrap();
+
+    // Expected from bash: high=8, medium=18
+    assert_eq!(high, 8, "HIGH risk count mismatch for infected-project");
+    assert_eq!(
+        medium, 18,
+        "MEDIUM risk count mismatch for infected-project"
+    );
+}
+
+#[test]
+fn test_infected_project_paranoid_counts() {
+    let scanner = Scanner::new();
+    let test_dir = get_test_cases_dir().join("infected-project");
+
+    if !test_dir.exists() {
+        return;
+    }
+
+    let (high, medium, _low) = scanner.generate_summary_counts(&test_dir, true).unwrap();
+
+    // Expected from bash paranoid: high=8, medium=16 (typo/network are informational)
+    assert_eq!(
+        high, 8,
+        "HIGH risk count mismatch for infected-project (paranoid)"
+    );
+    assert_eq!(
+        medium, 16,
+        "MEDIUM risk count mismatch for infected-project (paranoid)"
+    );
+}
+
+#[test]
+fn test_clean_project_counts() {
+    let scanner = Scanner::new();
+    let test_dir = get_test_cases_dir().join("clean-project");
+
+    if !test_dir.exists() {
+        return;
+    }
+
+    let (high, medium, _low) = scanner.generate_summary_counts(&test_dir, false).unwrap();
+
+    // Clean project should have 0 findings
+    assert_eq!(high, 0, "Clean project should have 0 HIGH risk findings");
+    assert_eq!(
+        medium, 0,
+        "Clean project should have 0 MEDIUM risk findings"
+    );
+}

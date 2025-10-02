@@ -277,10 +277,22 @@ fn main() {
     }
 
     match scanner.check_packages(&scan_dir) {
-        Ok(v) => {
-            if !v.is_empty() {
-                println!("Compromised packages found:");
-                for (p, info) in v.iter() {
+        Ok((compromised, suspicious, namespaces)) => {
+            if !compromised.is_empty() {
+                println!("Compromised packages found (HIGH RISK):");
+                for (p, info) in compromised.iter() {
+                    println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
+                }
+            }
+            if !suspicious.is_empty() {
+                println!("Suspicious packages found (MEDIUM RISK - semver match):");
+                for (p, info) in suspicious.iter() {
+                    println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
+                }
+            }
+            if !namespaces.is_empty() {
+                println!("Namespace warnings (LOW RISK - informational):");
+                for (p, info) in namespaces.iter() {
                     println!("  - {}  {}", format_display_path(&p, &scan_dir), info);
                 }
             }

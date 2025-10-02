@@ -10,6 +10,10 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+
+mod semver;
+pub use semver::{semver_match, SemVer};
+
 #[macro_use]
 extern crate lazy_static;
 lazy_static! {
@@ -212,49 +216,29 @@ impl Scanner {
         Ok(results)
     }
 
-    pub fn check_packages(&self, scan_dir: &Path) -> Result<Vec<(PathBuf, String)>> {
-        let mut findings = Vec::new();
+    /// Check packages - returns three separate result types like bash
+    /// Returns: (compromised_exact, suspicious_semver, namespace_warnings)
+    pub fn check_packages(
+        &self,
+        scan_dir: &Path,
+    ) -> Result<(
+        Vec<(PathBuf, String)>,
+        Vec<(PathBuf, String)>,
+        Vec<(PathBuf, String)>,
+    )> {
+        let mut compromised_found = Vec::new();
+        let mut suspicious_found = Vec::new();
+        let mut namespace_warnings = Vec::new();
+
         for entry in WalkDir::new(scan_dir).into_iter().filter_map(Result::ok) {
             if entry.file_type().is_file() && entry.file_name() == "package.json" {
                 let path = entry.path().to_path_buf();
                 if let Ok(content) = fs::read_to_string(&path) {
-                    // Parse package.json as JSON and inspect dependency maps for exact matches
                     if let Ok(root) = serde_json::from_str::<JsonValue>(&content) {
-                        // helper to check a dependency map
                         let mut added_namespaces: HashSet<String> = HashSet::new();
-                        for package_info in &self.compromised_packages {
-                            let mut parts = package_info.splitn(2, ':');
-                            let package_name = parts.next().unwrap_or("");
-                            let malicious_version = parts.next().unwrap_or("");
 
-                            // check dependencies and devDependencies
-                            for dep_key in
-                                ["dependencies", "devDependencies", "peerDependencies"].iter()
-                            {
-                                if let Some(deps) = root.get(*dep_key).and_then(|d| d.as_object()) {
-                                    if let Some(v) = deps.get(package_name) {
-                                        let vstr = v.as_str().unwrap_or("");
-                                        // strip semver operators like ^ ~ >= etc. for simple comparison
-                                        let ver = vstr.trim().trim_start_matches(|c: char| {
-                                            c == '^' || c == '~' || c == '>'
-                                        });
-                                        if ver.starts_with(malicious_version)
-                                            || ver == malicious_version
-                                        {
-                                            findings.push((
-                                                path.clone(),
-                                                format!("{}@{}", package_name, malicious_version),
-                                            ));
-                                        }
-                                    }
-                                }
-                            }
-
-                            // also check lockfile-like entries in package.json "optionalDependencies" etc.
-                        }
-
-                        // Check for compromised namespaces by iterating dependency keys
-                        for dep_section in [
+                        // Check all dependency sections
+                        for dep_key in [
                             "dependencies",
                             "devDependencies",
                             "peerDependencies",
@@ -262,13 +246,51 @@ impl Scanner {
                         ]
                         .iter()
                         {
-                            if let Some(deps) = root.get(*dep_section).and_then(|d| d.as_object()) {
-                                for key in deps.keys() {
+                            if let Some(deps) = root.get(*dep_key).and_then(|d| d.as_object()) {
+                                for (package_name, version_value) in deps.iter() {
+                                    let package_version = version_value.as_str().unwrap_or("");
+
+                                    // Check against compromised packages
+                                    for malicious_info in &self.compromised_packages {
+                                        let mut parts = malicious_info.splitn(2, ':');
+                                        let malicious_name = parts.next().unwrap_or("");
+                                        let malicious_version = parts.next().unwrap_or("");
+
+                                        if package_name != malicious_name {
+                                            continue;
+                                        }
+
+                                        // Exact match (with or without semver operators)
+                                        let clean_version =
+                                            package_version.trim().trim_start_matches(|c: char| {
+                                                c == '^'
+                                                    || c == '~'
+                                                    || c == '>'
+                                                    || c == '='
+                                                    || c == '<'
+                                            });
+
+                                        if clean_version == malicious_version {
+                                            // Exact match - definitely compromised
+                                            compromised_found.push((
+                                                path.clone(),
+                                                format!("{}@{}", package_name, malicious_version),
+                                            ));
+                                        } else if semver_match(malicious_version, package_version) {
+                                            // Semver pattern match - potentially compromised
+                                            suspicious_found.push((
+                                                path.clone(),
+                                                format!("{}@{}", package_name, package_version),
+                                            ));
+                                        }
+                                    }
+
+                                    // Check for compromised namespaces
                                     for namespace in &self.compromised_namespaces {
-                                        if key.starts_with(namespace)
+                                        if package_name.starts_with(namespace)
                                             && !added_namespaces.contains(namespace)
                                         {
-                                            findings.push((
+                                            namespace_warnings.push((
                                                 path.clone(),
                                                 format!("Contains packages from compromised namespace: {}", namespace),
                                             ));
@@ -282,7 +304,7 @@ impl Scanner {
                 }
             }
         }
-        Ok(findings)
+        Ok((compromised_found, suspicious_found, namespace_warnings))
     }
 
     pub fn check_postinstall_hooks(&self, scan_dir: &Path) -> Result<Vec<(PathBuf, String)>> {
@@ -370,10 +392,44 @@ impl Scanner {
                                 ));
                             }
                             if re_xmlhttpprot.is_match(&content) {
-                                findings.push((
-                                    p.clone(),
-                                    "XMLHttpRequest prototype modification detected".to_string(),
-                                ));
+                                // Context-aware XMLHttpRequest detection (matching bash logic)
+                                let path_str = p.to_string_lossy();
+                                let is_framework = path_str.contains("/react-native/Libraries/Network/")
+                                    || path_str.contains("/next/dist/compiled/");
+                                let has_crypto_patterns = re_eth_addr.is_match(&content)
+                                    || re_known.is_match(&content)
+                                    || content.contains("webhook.site")
+                                    || re_phishing.is_match(&content);
+
+                                if is_framework {
+                                    if has_crypto_patterns {
+                                        findings.push((
+                                            p.clone(),
+                                            "XMLHttpRequest prototype modification with crypto patterns detected - HIGH RISK"
+                                                .to_string(),
+                                        ));
+                                    } else {
+                                        findings.push((
+                                            p.clone(),
+                                            "XMLHttpRequest prototype modification detected in framework code - LOW RISK"
+                                                .to_string(),
+                                        ));
+                                    }
+                                } else {
+                                    if has_crypto_patterns {
+                                        findings.push((
+                                            p.clone(),
+                                            "XMLHttpRequest prototype modification with crypto patterns detected - HIGH RISK"
+                                                .to_string(),
+                                        ));
+                                    } else {
+                                        findings.push((
+                                            p.clone(),
+                                            "XMLHttpRequest prototype modification detected - MEDIUM RISK"
+                                                .to_string(),
+                                        ));
+                                    }
+                                }
                             }
                             if re_known.is_match(&content) {
                                 findings.push((
@@ -1010,15 +1066,11 @@ impl Scanner {
             high += hashes.len();
         }
 
-        // packages -> compromised (HIGH) and namespaces (MEDIUM)
-        if let Ok(pkgs) = self.check_packages(scan_dir) {
-            for (_path, info) in pkgs {
-                if info.starts_with("Contains packages from compromised namespace:") {
-                    medium += 1;
-                } else {
-                    high += 1; // compromised package version
-                }
-            }
+        // packages -> compromised (HIGH), suspicious (MEDIUM), namespaces (LOW - informational)
+        if let Ok((compromised, suspicious, namespaces)) = self.check_packages(scan_dir) {
+            high += compromised.len();
+            medium += suspicious.len();
+            low += namespaces.len(); // Bash counts these as LOW RISK
         }
 
         // postinstall hooks -> HIGH
@@ -1031,14 +1083,13 @@ impl Scanner {
             medium += susp.len();
         }
 
-        // crypto patterns -> split high/medium according to message
+        // crypto patterns -> split high/medium/low according to message
         if let Ok(cryptos) = self.check_crypto_theft_patterns(scan_dir) {
             for (_p, info) in cryptos {
-                if info.contains("HIGH RISK")
-                    || info.contains("Known attacker wallet")
-                    || info.contains("XMLHttpRequest prototype")
-                {
+                if info.contains("HIGH RISK") {
                     high += 1;
+                } else if info.contains("LOW RISK") {
+                    low += 1;
                 } else {
                     medium += 1;
                 }
@@ -1072,14 +1123,13 @@ impl Scanner {
             medium += integ.len();
         }
 
-        // typosquatting -> MEDIUM (paranoid only)
+        // typosquatting and network exfiltration are checked in paranoid mode
+        // but NOT counted in summary (informational only, like bash)
+        // They are still included in detailed_report
         if paranoid {
-            if let Ok(typo) = self.check_typosquatting(scan_dir) {
-                medium += typo.len();
-            }
-            if let Ok(net) = self.check_network_exfiltration(scan_dir) {
-                medium += net.len();
-            }
+            // Just run the checks for detailed report, don't count
+            let _ = self.check_typosquatting(scan_dir);
+            let _ = self.check_network_exfiltration(scan_dir);
         }
 
         Ok((high, medium, low))
@@ -1108,14 +1158,26 @@ impl Scanner {
                 .collect::<Vec<_>>()),
         );
 
-        let pkgs = self.check_packages(scan_dir)?;
-        report.insert(
-            "compromised_packages".to_string(),
-            json!(pkgs
-                .iter()
-                .map(|(p, i)| json!({"path": p.to_string_lossy().to_string(), "info": i}))
-                .collect::<Vec<_>>()),
-        );
+        let (compromised, suspicious, namespaces) = self.check_packages(scan_dir)?;
+
+        // Combine all package findings for detailed report
+        let mut all_packages = Vec::new();
+        for (p, i) in compromised.iter() {
+            all_packages
+                .push(json!({"path": p.to_string_lossy().to_string(), "info": i, "risk": "HIGH"}));
+        }
+        for (p, i) in suspicious.iter() {
+            all_packages.push(
+                json!({"path": p.to_string_lossy().to_string(), "info": i, "risk": "MEDIUM"}),
+            );
+        }
+        for (p, i) in namespaces.iter() {
+            all_packages.push(
+                json!({"path": p.to_string_lossy().to_string(), "info": i, "risk": "MEDIUM"}),
+            );
+        }
+
+        report.insert("compromised_packages".to_string(), json!(all_packages));
 
         let posts = self.check_postinstall_hooks(scan_dir)?;
         report.insert(
